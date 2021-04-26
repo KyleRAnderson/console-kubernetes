@@ -1,0 +1,86 @@
+# TODO this is incomplete.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: console-backend-config
+  namespace: default
+data:
+  frontend.api-url: http://test.com
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: console-backend
+  labels:
+    {{- include "hunt-console.labels" . | nindent 4 }}
+    app: &app_name console-backend
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "hunt-console.selectorLabels" . | nindent 6 }}
+      app: *app_name
+  template:
+    metadata:
+      labels:
+        {{- include "hunt-console.selectorLabels" . | nindent 8 }}
+        app: *app_name
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}-backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - containerPort: 3000
+              name: main-app
+          livenessProbe:
+            httpGet:
+              path: /api/v1/
+              port: main-app
+          readinessProbe:
+            httpGet:
+              path: /api/v1/
+              port: main-app
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+              # TODO I don't like hardcoding these, I would prefer to use the postgresql's
+              # chart template, but that's not possible because of https://github.com/helm/helm/issues/3920.
+              # Please update this section if that issue ever gets resolved, or
+              # a better way presents itself.
+            - name: DATABASE_URL
+              {{- $port := .Values.postgresql.service.port -}}
+              {{- $username := .Values.postgresql.postgresqlUsername -}}
+              {{- $database := .Values.postgresql.postgresqlDatabase -}}
+              {{- $host := printf "%s-postgresql" .Release.Name }}
+              value: {{ printf "postgres://%s@%s:%.0f/%s" $username $host $port $database }}
+            - name: HUNT_CONSOLE_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresql-password
+                  name: {{ .Release.Name }}-postgresql
+            {{- $redis_port := .Values.redis.master.service.port -}}
+            {{- $redis_host := printf "%s-redis" .Release.Name }}
+            - name: REDIS_URL
+              value: {{ printf "redis://%s:%.0f" $redis_host $redis_port }}
+            - name: FRONTEND_HOST_URL
+              # TODO this accessor isn't great, relies on index 1 being the frontend
+              {{ with index .Values.ingress.hosts 1 -}}
+              value: {{ printf "http://%s" .host }}
+              {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: console-backend
+spec:
+  selector:
+    {{- include "hunt-console.selectorLabels" . | nindent 4 }}
+    app: console-backend
+  ports:
+    - protocol: TCP
+      port: {{ .Values.backend.service.port }}
+      targetPort: main-app # Named target port for the pod's container.
+  type: {{ .Values.backend.service.type }}

@@ -1,0 +1,125 @@
+# Default values for hunt-console.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+backend:
+  image:
+    # repository: registry.gitlab.com/hunt-console/console-backend # TODO
+    repository: console-backend
+    pullPolicy: IfNotPresent
+    tag: "v1" # TODO would want versioning
+  service:
+    type: LoadBalancer
+    port: 81
+frontend:
+  image:
+    # repository: registry.gitlab.com/hunt-console/console-frontend # TODO
+    repository: console-frontend
+    pullPolicy: IfNotPresent
+    tag: "v2" # TODO would want versioning
+  service:
+    type: LoadBalancer
+    port: 80
+
+# image:
+#   repository: nginx
+#   pullPolicy: IfNotPresent
+#   # Overrides the image tag whose default is the chart appVersion.
+#   tag: ""
+
+imagePullSecrets: []
+nameOverride: "hunt-console"
+fullnameOverride: "console-chart"
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: "hunt-console"
+
+podAnnotations: {}
+
+podSecurityContext:
+  {}
+  # fsGroup: 2000
+
+securityContext:
+  {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+ingress:
+  enabled: true
+  annotations:
+    {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: backend.hunt-console.local # Backend
+      paths:
+        - path: /
+          backend:
+            serviceName: console-backend
+            servicePort: 81
+    - host: hunt-console.local # Frontend
+      paths:
+        - path: /
+          backend:
+            serviceName: console-frontend
+            servicePort: 80
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+postgresql:
+  postgresqlUsername: console
+  postgresqlDatabase: hunt-console
+  service:
+    # TODO only defining this so I can access it myself.
+    # Wouldn't need to if https://github.com/helm/helm/issues/3920 is resolved.
+    port: 5432
+  image:
+    tag: 12.6.0
+
+redis:
+  master:
+    service:
+      # TODO only defining this so I can access it myself.
+      # Wouldn't need to if https://github.com/helm/helm/issues/3920 is resolved.
+      port: 6379

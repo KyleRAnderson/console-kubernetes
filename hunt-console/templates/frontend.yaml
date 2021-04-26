@@ -2,16 +2,15 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: console-frontend-config
-  namespace: default
 data:
-  frontend.api-url: http://test.com
+  frontend.api-url: http://backend.hunt-console.local # TODO use config here.
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: console-frontend
-  namespace: default
   labels:
+    {{- include "hunt-console.labels" . | nindent 4 }}
     app: &app_name console-frontend
 spec:
   replicas: 2
@@ -24,9 +23,9 @@ spec:
         app: *app_name
     spec:
       containers:
-        - name: console-frontend
-          image: console-frontend:latest
-          imagePullPolicy: Never
+        - name: {{ .Chart.Name }}-frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           ports:
             - containerPort: 443
               name: main-app
@@ -41,12 +40,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: console-frontend
-  namespace: default
 spec:
   selector:
     app: console-frontend
   ports:
     - protocol: TCP
-      port: 443
+      port: {{ .Values.frontend.service.port }}
       targetPort: main-app
-  type: NodePort
+  type: {{ .Values.frontend.service.type }}
